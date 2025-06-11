@@ -1,6 +1,8 @@
 import argparse
 from dataclasses import dataclass
 from typing import Iterable, List
+import json
+import concurrent.futures
 #
 import numpy as np
 import scipy.io.wavfile as wav
@@ -172,7 +174,12 @@ class Stanag4285Decoder:
             out.append(byte)
         return "".join(chr(b) if 32 <= b <= 126 else "." for b in out)
 
-    def decode(self, plot: bool = False) -> List[np.ndarray]:
+    def decode(
+        self,
+        plot: bool = False,
+        plot_file: str = "detected_bursts.png",
+        json_outfile: str = "decoded_results.json",
+    ) -> List[np.ndarray]:
         self.signal.load()
         env, rate_env = self.signal.envelope()
         burst_times = self.burst_finder.find(env, rate_env)
@@ -190,15 +197,22 @@ class Stanag4285Decoder:
             return []
 
         console.print(f"[bold cyan]Detected {len(preambles)} burst(s).[/bold cyan]")
-        results: List[np.ndarray] = []
-        for t in preambles:
+
+        def process_burst(t: float) -> dict:
             seg = self.id_extractor.extract(t, bits)
-            results.append(seg)
-            console.print(
-                f"Burst at {t:.3f} sec → {self._bits_to_ascii(seg)}",
-                style="green",
-                markup=False,
-            )
+            return {
+                "time": t,
+                "ascii": self._bits_to_ascii(seg),
+            }
+
+        with concurrent.futures.ThreadPoolExecutor() as ex:
+            burst_info = list(ex.map(process_burst, preambles))
+
+        results: List[np.ndarray] = [self.id_extractor.extract(t, bits) for t in preambles]
+
+        with open(json_outfile, "w") as f:
+            json.dump(burst_info, f, indent=2)
+        console.print(f"[green]Results written to {json_outfile}[/green]")
 
         if plot and plt is not None:
             time_env = np.arange(len(env)) / rate_env
@@ -211,7 +225,8 @@ class Stanag4285Decoder:
             plt.ylabel("Amplitude Variance")
             plt.title("Detected Bursts")
             plt.tight_layout()
-            plt.show()
+            plt.savefig(plot_file)
+            plt.close()
 
         return results
 
@@ -219,10 +234,24 @@ class Stanag4285Decoder:
 def main() -> None:
     parser = argparse.ArgumentParser(description="Decode STANAG 4285 station ID from WAV")
     parser.add_argument("wavfile", help="Input WAV file")
-    parser.add_argument("--plot", action="store_true", help="Show diagnostic plot")
+    parser.add_argument("--plot", action="store_true", help="Save diagnostic plot")
+    parser.add_argument(
+        "--plot-file",
+        default="detected_bursts.png",
+        help="Filename for plot image",
+    )
+    parser.add_argument(
+        "--outfile",
+        default="decoded_results.json",
+        help="JSON file for decoded ASCII",
+    )
     args = parser.parse_args()
 
-    Stanag4285Decoder(args.wavfile).decode(plot=args.plot)
+    Stanag4285Decoder(args.wavfile).decode(
+        plot=args.plot,
+        plot_file=args.plot_file,
+        json_outfile=args.outfile,
+    )
 
 
 if __name__ == "__main__":
