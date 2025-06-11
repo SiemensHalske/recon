@@ -115,9 +115,10 @@ class Descrambler:
         self.seed = seed
 
     def descramble(self, bit_stream: Iterable[int]) -> np.ndarray:
-        lfsr = self.seed
+        lfsr = int(self.seed)
         out = np.zeros(len(bit_stream), dtype=np.uint8)
         for i, b in enumerate(bit_stream):
+            b = int(b)
             fb = ((lfsr >> 8) & 1) ^ ((lfsr >> 3) & 1)
             out[i] = b ^ fb
             lfsr = ((lfsr << 1) & 0x1FF) | (b & 1)
@@ -135,7 +136,8 @@ class PreambleDetector:
     def detect(self, bit_stream: np.ndarray) -> List[float]:
         pattern_pm = 2 * self.pattern - 1
         stream_pm = 2 * bit_stream - 1
-        corr = np.correlate(stream_pm, pattern_pm, mode="valid") / len(self.pattern)
+        corr = np.correlate(stream_pm, pattern_pm,
+                            mode="valid") / len(self.pattern)
         idx = np.where(corr >= self.threshold)[0]
         return (idx / self.bit_rate).tolist()
 
@@ -150,7 +152,7 @@ class StationIdExtractor:
     def extract(self, start_time: float, bit_stream: np.ndarray) -> np.ndarray:
         start_idx = int(start_time * self.bit_rate)
         nbits = int(self.duration_sec * self.bit_rate)
-        return bit_stream[start_idx : start_idx + nbits]
+        return bit_stream[start_idx: start_idx + nbits]
 
 
 class Stanag4285Decoder:
@@ -190,13 +192,15 @@ class Stanag4285Decoder:
         preambles = self.preamble_detector.detect(bits)
 
         if burst_times:
-            preambles = [t for t in preambles if any(abs(t - c) < 0.5 for c in burst_times)]
+            preambles = [t for t in preambles if any(
+                abs(t - c) < 0.5 for c in burst_times)]
 
         if not preambles:
             console.print("[bold red]No bursts detected.[/bold red]")
             return []
 
-        console.print(f"[bold cyan]Detected {len(preambles)} burst(s).[/bold cyan]")
+        console.print(
+            f"[bold cyan]Detected {len(preambles)} burst(s).[/bold cyan]")
 
         def process_burst(t: float) -> dict:
             seg = self.id_extractor.extract(t, bits)
@@ -208,7 +212,8 @@ class Stanag4285Decoder:
         with concurrent.futures.ThreadPoolExecutor() as ex:
             burst_info = list(ex.map(process_burst, preambles))
 
-        results: List[np.ndarray] = [self.id_extractor.extract(t, bits) for t in preambles]
+        results: List[np.ndarray] = [
+            self.id_extractor.extract(t, bits) for t in preambles]
 
         with open(json_outfile, "w") as f:
             json.dump(burst_info, f, indent=2)
@@ -216,9 +221,10 @@ class Stanag4285Decoder:
 
         if plot and plt is not None:
             time_env = np.arange(len(env)) / rate_env
-            var = self.burst_finder._moving_variance(env, int(self.burst_finder.window_sec * rate_env))
+            var = self.burst_finder._moving_variance(
+                env, int(self.burst_finder.window_sec * rate_env))
             plt.figure(figsize=(12, 5))
-            plt.plot(time_env[int(self.burst_finder.window_sec * rate_env / 2) : int(self.burst_finder.window_sec * rate_env / 2) + len(var)], var)
+            plt.plot(time_env[int(self.burst_finder.window_sec * rate_env / 2): int(self.burst_finder.window_sec * rate_env / 2) + len(var)], var)
             for t in preambles:
                 plt.axvline(t, color="red", linestyle="--")
             plt.xlabel("Time [s]")
@@ -232,9 +238,11 @@ class Stanag4285Decoder:
 
 
 def main() -> None:
-    parser = argparse.ArgumentParser(description="Decode STANAG 4285 station ID from WAV")
+    parser = argparse.ArgumentParser(
+        description="Decode STANAG 4285 station ID from WAV")
     parser.add_argument("wavfile", help="Input WAV file")
-    parser.add_argument("--plot", action="store_true", help="Save diagnostic plot")
+    parser.add_argument("--plot", action="store_true",
+                        help="Save diagnostic plot")
     parser.add_argument(
         "--plot-file",
         default="detected_bursts.png",
