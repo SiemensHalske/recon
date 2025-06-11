@@ -128,10 +128,17 @@ class Descrambler:
 class PreambleDetector:
     """Detect preambles by correlating with a known bit pattern."""
 
-    def __init__(self, pattern: np.ndarray, bit_rate: int, threshold: float = 0.8) -> None:
+    def __init__(
+        self,
+        pattern: np.ndarray,
+        bit_rate: int,
+        threshold: float = 0.85,
+        holdoff_sec: float = HOLD_OFF_SEC,
+    ) -> None:
         self.pattern = np.array(pattern, dtype=np.uint8)
         self.bit_rate = bit_rate
         self.threshold = threshold
+        self.holdoff_bits = int(holdoff_sec * bit_rate)
 
     def detect(self, bit_stream: np.ndarray) -> List[float]:
         pattern_pm = 2 * self.pattern - 1
@@ -139,7 +146,15 @@ class PreambleDetector:
         corr = np.correlate(stream_pm, pattern_pm,
                             mode="valid") / len(self.pattern)
         idx = np.where(corr >= self.threshold)[0]
-        return (idx / self.bit_rate).tolist()
+
+        filtered: List[int] = []
+        last = -self.holdoff_bits
+        for i in idx:
+            if i - last >= self.holdoff_bits:
+                filtered.append(i)
+                last = i
+
+        return [i / self.bit_rate for i in filtered]
 
 
 class StationIdExtractor:
@@ -163,7 +178,9 @@ class Stanag4285Decoder:
         self.burst_finder = BurstFinder()
         self.demodulator = QpskDemodulator()
         self.descrambler = Descrambler()
-        self.preamble_detector = PreambleDetector(preamble, BIT_RATE)
+        self.preamble_detector = PreambleDetector(
+            preamble, BIT_RATE, threshold=0.85, holdoff_sec=HOLD_OFF_SEC
+        )
         self.id_extractor = StationIdExtractor()
 
     def _bits_to_ascii(self, bits: np.ndarray) -> str:
@@ -241,8 +258,10 @@ def main() -> None:
     parser = argparse.ArgumentParser(
         description="Decode STANAG 4285 station ID from WAV")
     parser.add_argument("wavfile", help="Input WAV file")
+
     parser.add_argument("--plot", action="store_true",
                         help="Save diagnostic plot")
+
     parser.add_argument(
         "--plot-file",
         default="detected_bursts.png",
