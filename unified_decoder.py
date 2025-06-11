@@ -194,7 +194,11 @@ class Stanag4285Decoder:
         for t in preambles:
             seg = self.id_extractor.extract(t, bits)
             results.append(seg)
-            console.print(f"[green]Burst at {t:.3f} sec → {self._bits_to_ascii(seg)}[/green]")
+            console.print(
+                f"Burst at {t:.3f} sec → {self._bits_to_ascii(seg)}",
+                style="green",
+                markup=False,
+            )
 
         if plot and plt is not None:
             time_env = np.arange(len(env)) / rate_env
