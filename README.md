@@ -162,10 +162,11 @@ performance characteristics for burst detection and file handling.
 
 Recon Tools is provided for educational and research use.  Depending on
 your jurisdiction, monitoring certain frequencies may require a licence
-or authorisation.  The maintainers do not condone misuse.  When
-recording or storing potentially sensitive traffic, protect the data as
-you would any other classified material: use encrypted storage and limit
-access on a need‑to‑know basis.
+or authorisation.  + The maintainers explicitly prohibit any misuse for
+unauthorized surveillance or intelligence purposes.  When recording or
+storing potentially sensitive traffic, protect the data as you would any
+other classified material: use encrypted storage and limit access on a
+need‑to‑know basis.
 
 ## License
 
