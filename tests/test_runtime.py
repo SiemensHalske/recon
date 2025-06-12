@@ -40,14 +40,26 @@ def test_runtime_small_dataset(tmp_path):
     )
 
     # 3) Messen der Laufzeit
+    # 3) Prefix-Datei anlegen, damit der Extractor laufen kann
+    prefixes = tmp_path / "prefixes.yaml"
+    prefixes.write_text(
+        "\n".join([
+            "icao_prefixes:",
+            "  - AA",
+            "itu_prefixes: []",
+            "military_prefixes: []",
+        ]) + "\n"
+    )
+
+    # 4) Messen der Laufzeit
     start = time.perf_counter()
     processor.process(
         directory=data_dir,
-        config_path=Path("prefixes.yaml"),
+        config_path=prefixes,
         min_count=1,
         show_other=False
     )
     duration = time.perf_counter() - start
 
-    # 4) Assertion: darf nicht länger als 2 Sekunden dauern
+    # 5) Assertion: darf nicht länger als 2 Sekunden dauern
     assert duration < 2.0, f"Processing took too long: {duration:.2f}s"
