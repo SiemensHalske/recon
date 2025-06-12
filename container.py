@@ -147,7 +147,7 @@ if __name__ == "__main__":
     recorder = WebSDR(
         server="g4wim.proxy.kiwisdr.com",
         port="8073",
-        freq="25382.58",
+        freq="8619.083",
         mode="usb",
         basename="test25382-58",
         tlimit="240"
